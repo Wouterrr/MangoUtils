@@ -21,7 +21,7 @@
  * If you don't actively release your locks, the collection will fill up
  * with expired locks that were never actively deleted. To remove those run:
  *
- * Mango::factory('surv')->clear_expired();
+ * Mango::factory('lock')->clear_expired();
  *
  */
 
@@ -29,90 +29,103 @@
 class Model_Lock extends Mango {
 
 	protected $_fields = array(
-		'ends'      => array('type'=>'int','required' => TRUE),
-		'user_id'   => array('type'=>'MongoId','required' => TRUE),
+		'_id'       => array('type' => 'string', 'required' => TRUE),
+		'ends'      => array('type' => 'float', 'required' => TRUE),
+		'user_id'   => array('type' => 'MongoId', 'required' => TRUE)
 	);
 
 	/**
 	 * Try to (update) lock $object by $user for $time seconds
 	 *
-	 * @param   Mango    locked object
-	 * @param   Mango    locking user
-	 * @param   int      number of seconds before lock should timeout
-	 * @return  boolean  lock retrieved
+	 * @param   Mango|string   locked object or unique lock string
+	 * @param   Mango          locking user
+	 * @param   int            number of seconds before lock should timeout
+	 * @return  float|boolean  FALSE when failed, otherwise time (in seconds from epoch) when lock will expire
 	 */
-	public function get( Mango $object, Mango $user, $time = 600)
+	public function get( $lock_key, Mango $user, $time = 600)
 	{
-		$this->values(array(
-			'_id' => $object->_id
+		if ( $lock_key instanceof Mango)
+		{
+			$lock_key = $lock_key->_id;
+		}
+
+		$this->values( array(
+			'_id' => (string) $lock_key
 		))->load();
 
-		if ( $this->loaded() && (string) $this->user_id !== (string) $user->_id && time() < $this->ends)
+		$now = round(microtime(true),4);
+
+		if ( $this->loaded() && (string) $this->user_id !== (string) $user->_id && $now < $this->ends)
 		{
 			// another user has active lock
 			return FALSE;
 		}
 
 		$values = array(
-			'_id'     => $object->_id,
+			'_id'     => (string) $lock_key,
 			'user_id' => $user->_id,
-			'ends'    => time() + $time
+			'ends'    => $now + $time
 		);
 
 		if ( ! $this->loaded())
 		{
-			// create lock
+			// create
 			try
 			{
 				$this->values($values)->create();
+
+				return $this->ends;
 			}
 			catch ( Mango_Exception $e)
 			{
 				// a lock for this object was just created, this one failed
 				return FALSE;
 			}
-
-			return TRUE;
 		}
 		else
 		{
+			// update criteria
+			$criteria = array(
+				'ends' => $this->ends
+			);
+
 			// update lock
-			$ends = $this->ends;
+			$this->values($values)->update($criteria);
 
-			// load values
-			$this->values($values);
+			$err = $this->_db->last_error();
 
-			if ( $this->changed(TRUE) === array())
-			{
-				// no changes (update same lock in same second)
-				return TRUE;
-			}
-			else
-			{
-				$this->update(array(
-					'ends' => $ends
-				));
-	
-				$err = $this->_db->last_error();
-
-				return (bool) $err['updatedExisting'];
-			}
+			return (bool) $err['updatedExisting']
+				? $this->ends
+				: FALSE;
 		}
 	}
 
 	/**
 	 * Release a lock for object $object/user $user
 	 *
-	 * @param   Mango    locked object
-	 * @param   Mango    locking user
+	 * @param   Mango|string  locked object | lock string
+	 * @param   Mango         locking user
+	 * @param   float         expire time of lock (optional)
 	 * @return  void
 	 */
-	public function release( Mango $object, Mango $user)
+	public function release( $lock_key, Mango $user, $ends = NULL)
 	{
-		$this->_db->remove( $this->_collection, array(
-			'_id'     => $object->_id,
+		if ( $lock_key instanceof Mango)
+		{
+			$lock_key = $lock_key->_id;
+		}
+
+		$criteria = array(
+			'_id'     => (string) $lock_key,
 			'user_id' => $user->_id
-		));
+		);
+
+		if ( $ends !== NULL)
+		{
+			$criteria['ends'] = (float) $ends;
+		}
+
+		$this->_db->remove( $this->_collection, $criteria);
 	}
 
 	/**
@@ -120,6 +133,6 @@ class Model_Lock extends Mango {
 	 */
 	public function clear_expired()
 	{
-		$this->_db->remove( $this->_collection, array('ends' => array('$lt' => time())));
+		$this->_db->remove( $this->_collection, array('ends' => array('$lt' => round(microtime(true),4))));
 	}
 }
