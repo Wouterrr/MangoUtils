@@ -125,7 +125,7 @@ class Model_Lock extends Mango {
 			$criteria['ends'] = (float) $ends;
 		}
 
-		$this->_db->remove( $this->_collection, $criteria);
+		$this->db()->remove( $this->_collection, $criteria);
 	}
 
 	/**
