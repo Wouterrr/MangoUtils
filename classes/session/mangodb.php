@@ -7,162 +7,130 @@
  * @package Kohana
  * @category Session
  * @license http://www.fsf.org/licensing/licenses/agpl-3.0.html GNU Affero GPL 3
+ *
+ * Modified by Wouter
+ * http://github.com/Wouterrr
  */
 
 class Session_MangoDB extends Session
 {
-  /**
-   * @var garbage collection requests
-   */
-  protected $_gc = 500;
+	/**
+	 * @var garbage collection requests
+	 */
+	protected $_gc = 500;
+	
+	/**
+	 * @var string the current session
+	 */
+	protected $_session;
 
-  /**
-   * @var string the current session id
-   */
-  protected $_session_id;
+	/**
+	 * Constructor
+	 */
+	public function __construct(array $config = NULL, $id = NULL)
+	{
+		// Load aditional config
 
-  /**
-   * @var string id the old session id
-   */
-  protected $_update_id;
+		if ( isset($config['gc']) )
+		{
+			$this->_gc = (int) $config['gc'];
+		}
 
-  /**
-   * Constructor
-   */
-  public function __construct(array $config = NULL, $id = NULL)
-  {
-    // Load aditional config
+		parent::__construct($config, $id);
 
-    if ( isset($config['gc']) )
-    {
-      $this->_gc = (int) $config['gc'];
-    }
+		if ( mt_rand(0, $this->_gc) === $this->_gc )
+		{
+			// Collect
+			$this->_gc();
+		}
+	}
 
-    parent::__construct($config, $id);
+	/**
+	 * Read session data
+	 *
+	 * @param integer $id
+	 */
+	protected function _read($id = NULL)
+	{
+		if ( $id OR $id = Cookie::get($this->_name))
+		{
+			$id = explode('.', $id);
 
-    if ( mt_rand(0, $this->_gc) === $this->_gc )
-    {
-      // Collect
-      $this->_gc();
-    }
-  }
+			if ( count($id) === 2)
+			{
+				$session = Mango::factory('session', array(
+					'_id'   => $id[0],
+					'token' => $id[1]
+				))->load();
+	
+				if ( $session->loaded() )
+				{
+					$this->_session = $session;
+	
+					return $session->contents;
+				}
+			}
+		}
 
-  /**
-   * Read session data
-   *
-   * @param integer $id
-   */
-  protected function _read($id = NULL)
-  {
-    if ($id OR $id = Cookie::get($this->_name))
-    {
-      $session = Mango::factory('session', array('session_id' => $id))->load();
-
-      if ( $session->loaded() )
-      {
-        $this->_session_id = $this->_update_id = $id;
-
-        $data = $session->as_array();
-
-        return $data['contents'];
-      }
-    }
-
-    // Create new session id
-    $this->_regenerate();
-
-    return NULL;
-  }
+		return NULL;
+	}
 
   /**
    * Create new session
    */
-  protected function _regenerate()
-  {
-    do
-    {
-      // generate new identifier
-      $id = str_replace('.', '-', uniqid(NULL, TRUE));
-
-      $session = Mango::factory('session', array('session_id' => $id))->load();
-    }
-    while($session->loaded());
-
-    return $this->_session_id = $id;
-  }
+	protected function _regenerate()
+	{
+		// nothing here as the token is regenerated no matter what
+	}
 
   /**
    * Write session data
    */
   protected function _write()
   {
-    if ($this->_update_id === NULL)
-    {
-      // New session
-      $data = array(
-          'session_id' => $this->_session_id,
-          'last_active' => $this->_data['last_active'],
-          'contents' => $this->__toString()
-      );
+		if ( $this->_session === NULL)
+		{
+			$this->_session = Mango::factory('session');
+		}
 
-      Mango::factory('session', $data)->create();
-    }
-    else
-    {
-      // Update
-      $session = Mango::factory('session', array('session_id' => $this->_update_id))->load();
+		$this->_session->values( array(
+			'last_active' => $this->_data['last_active'],
+			'contents'    => (string) $this,
+			'token'       => new MongoId // regenerate against session fixation attacks
+		));
 
-      $session->last_active = $this->_data['last_active'];
-      $session->contents = $this->__toString();
+		$this->_session->loaded()
+			? $this->_session->update()
+			: $this->_session->create();
 
-      if ($this->_update_id !== $this->_session_id)
-      {
-        $session->session_id = $this->_session_id;
-      }
+		// Update cookie
+		Cookie::set($this->_name, $this->_session->_id . '.' . $this->_session->token, $this->_lifetime);
 
-      $session->update();
-    }
-
-    $this->_update_id = $this->_session_id;
-
-    // Update cookie
-    Cookie::set($this->_name, $this->_session_id, $this->_lifetime);
-
-    return TRUE;
-  }
+		return TRUE;
+	}
 
   /**
    * Delete session
    */
   protected function _destroy()
   {
-    if ($this->_update_id === NULL)
-    {
-      return TRUE;
-    }
+		if ( $this->_session !== NULL && $this->_session->loaded())
+		{
+			$this->_session->delete();
+			$this->_session = NULL;
 
-    try
-    {
-      // Delete actual session
-      Mango::factory('session', array('session_id' => $this->_update_id))->delete();
+			Cookie::delete($this->_name);
+		}
 
-      // Delete cookie
-      Cookie::delete($this->_name);
-    }
-    catch (Exception $e)
-    {
-      return FALSE;
-    }
-
-    return TRUE;
-  }
+		return TRUE;
+	}
 
   /**
    * Garbage Collector to delete old sessions
    */
   protected function _gc()
   {
-    if ($this->_lifetime)
+    if ( $this->_lifetime)
     {
       $expires = $this->_lifetime;
     }
@@ -172,11 +140,6 @@ class Session_MangoDB extends Session
     }
 
     // Delete old sessions
-    $sessions = Mango::factory('session')->load(false, null, null, array(), array('last_active' => array('$lt' => time() - $expires)));
-
-    foreach($sessions as $session)
-    {
-      $session->delete();
-    }
+    Mango::factory('session')->db()->remove('sessions', array('last_active' => array('$lt' => time() - $expires)));
   }
 }
