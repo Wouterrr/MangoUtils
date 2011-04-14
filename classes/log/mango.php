@@ -2,7 +2,7 @@
 /**
  * MangoDB log writer.
  */
-class Log_Mango extends Kohana_Log_Writer {
+class Log_Mango extends Log_Writer {
 
 	/*
 	 * Collection to write log data to
