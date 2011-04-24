@@ -2,7 +2,8 @@
 class Model_Task extends Mango {
 
 	protected $_fields = array(
-		'request'  => array('type' => 'string', 'required' => TRUE, 'filters' => array(array('serialize'))),
+		'request'  => array('type' => 'string', 'filters' => array(array('serialize'))),
+		'uri'      => array('type' => 'string'),
 		'active'   => array('type' => 'boolean'),
 		'failed'   => array('type' => 'boolean'),
 		'error'    => array('type' => 'string'),
