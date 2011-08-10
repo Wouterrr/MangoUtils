@@ -30,7 +30,7 @@ class Model_Lock extends Mango {
 
 	protected $_fields = array(
 		'_id'       => array('type' => 'string', 'required' => TRUE),
-		'ends'      => array('type' => 'float', 'required' => TRUE),
+		'ends'      => array('type' => 'int', 'required' => TRUE),
 		'user_id'   => array('type' => 'MongoId', 'required' => TRUE)
 	);
 
@@ -53,7 +53,7 @@ class Model_Lock extends Mango {
 			'_id' => (string) $lock_key
 		))->load();
 
-		$now = round(microtime(true),4);
+		$now = time();
 
 		if ( $this->loaded() && (string) $this->user_id !== (string) $user->_id && $now < $this->ends)
 		{
