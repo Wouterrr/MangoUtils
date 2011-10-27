@@ -4,38 +4,60 @@ class Model_Task extends Mango {
 	protected $_fields = array(
 		'request'  => array('type' => 'string', 'filters' => array(array('serialize'))),
 		'uri'      => array('type' => 'string'),
-		'active'   => array('type' => 'boolean'),
-		'failed'   => array('type' => 'boolean'),
-		'error'    => array('type' => 'string'),
-		'time'     => array('type' => 'int')
+		'status'   => array('type' => 'enum', 'values' => array('queued', 'active', 'failed', 'completed'))
+		'message'  => array('type' => 'string'),
+		'create'   => array('type' => 'int'),
+		'updated'  => array('type' => 'int')
 	);
 
 	public function create($safe = TRUE)
 	{
-		$this->time = time();
+		$this->created = time();
+
 		return parent::create($safe);
+	}
+
+	public function update( $criteria = array(), $safe = TRUE)
+	{
+		$this->updated = time();
+
+		return parent::update($criteria, $safe);
 	}
 
 	public function requeue()
 	{
-		unset($this->active, $this->failed, $this->error);
+		$this->status  = 'queued';
+		$this->created = time();
+		$this->update();
+	}
 
-		$this->time = time();
-		$this->update(array(), TRUE);
+	public function fail($message)
+	{
+		$this->message = $message;
+		$this->status  = 'failed';
+		$this->update();
+	}
+
+	public function complete()
+	{
+		$this->status = 'completed';
+		$this->update();
 	}
 
 	public function get_next()
 	{
-		$query = array(
-			'active' => array('$exists' => FALSE),
-			'failed' => array('$exists' => FALSE)
-		);
-
 		$values = $this->db()->command( array(
 			'findAndModify' => $this->_collection,
-			'query'         => $query,
-			'sort'          => array('time' => 1),
-			'update'        => array('$set' => array('active' => TRUE)),
+			'query'         => array(
+				'status'    => array_search('queued', $this->_fields['status']['values'])
+			),
+			'sort'          => array('created' => 1),
+			'update'        => array(
+				'$set'    => array(
+					'updated' => time()
+					'status'  => array_search('active', $this->_fields['status']['values'])
+				)
+			),
 			'new'           => TRUE
 		));
 
