@@ -4,7 +4,7 @@ class Model_Task extends Mango {
 	protected $_fields = array(
 		'request'  => array('type' => 'string', 'filters' => array(array('serialize'))),
 		'uri'      => array('type' => 'string'),
-		'status'   => array('type' => 'enum', 'values' => array('queued', 'active', 'failed', 'completed'))
+		'status'   => array('type' => 'enum', 'values' => array('queued', 'active', 'failed', 'completed')),
 		'message'  => array('type' => 'string'),
 		'create'   => array('type' => 'int'),
 		'updated'  => array('type' => 'int')
