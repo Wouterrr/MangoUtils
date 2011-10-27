@@ -54,7 +54,7 @@ class Model_Task extends Mango {
 			'sort'          => array('created' => 1),
 			'update'        => array(
 				'$set'    => array(
-					'updated' => time()
+					'updated' => time(),
 					'status'  => array_search('active', $this->_fields['status']['values'])
 				)
 			),
