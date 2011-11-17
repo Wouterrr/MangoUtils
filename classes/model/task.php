@@ -6,7 +6,7 @@ class Model_Task extends Mango {
 		'uri'      => array('type' => 'string'),
 		'status'   => array('type' => 'enum', 'values' => array('queued', 'active', 'failed', 'completed')),
 		'message'  => array('type' => 'string'),
-		'create'   => array('type' => 'int'),
+		'created'  => array('type' => 'int'),
 		'updated'  => array('type' => 'int')
 	);
 
