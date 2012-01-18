@@ -15,6 +15,11 @@
 							{
 								$data[$name] = Date(DATE_ATOM, $data[$name]);
 							}
+						case 'set':
+							if ( isset($data[$name]))
+							{
+								$data[$name] = implode(',', $data[$name]);
+							}
 						case 'string':
 						case 'email':
 							$type = 'text';
@@ -41,6 +46,7 @@
 						case 'checkbox':
 							$form = form::checkbox($name, 1, Arr::get($data, $name), array('class' => 'checkbox', 'id' => $id));
 						break;
+						case 'set':
 						case 'number':
 						case 'text':
 						case 'email':
