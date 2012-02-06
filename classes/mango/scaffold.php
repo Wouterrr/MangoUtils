@@ -19,28 +19,20 @@ class Mango_Scaffold {
 			}
 		}
 
-		foreach ( $post as $name => $data)
+		foreach ( $post as $name => $value)
 		{
 			if ( $field = $document->field($name))
 			{
-				switch ( $document->field($name))
+				switch ( $field['type'])
 				{
 					case 'set': 
-						$value = isset($post[$name]) && is_string($post[$name]) && ! empty($post[$name])
-							? explode(',', $post[$name])
+						$value = is_string($value) && $value !== ''
+							? explode(',', $value)
 							: NULL;
-					break;
-					default:
-						$value = Arr::get($post, $name);
 					break;
 				}
 			}
 			else
-			{
-				continue;
-			}
-
-			if ( $value === '' && ! $document->__isset($name))
 			{
 				continue;
 			}
