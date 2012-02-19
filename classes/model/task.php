@@ -12,7 +12,10 @@ class Model_Task extends Mango {
 
 	public function create($safe = TRUE)
 	{
-		$this->created = time();
+		$this->values( array(
+			'created' => time(),
+			'status'  => 'queued'
+		));
 
 		return parent::create($safe);
 	}
