@@ -21,8 +21,31 @@ class Acl_Assert_Argument implements Acl_Assert_Interface {
 		foreach ( $this->_arguments as $role_key => $resource_key)
 		{
 			// normalize arguments & compare
-			if ( Mango::normalize($role->$role_key) !== Mango::normalize($resource->$resource_key))
+			$allow_same = TRUE;
+
+			if ( strpos($role_key, '!') === 0)
 			{
+				$role_key   = substr($role_key, 1);
+				$allow_same = ! $allow_same;
+			}
+
+			if ( strpos($resource_key, '!') === 0)
+			{
+				$resource_key = substr($resource_key, 1);
+				$allow_same   = ! $allow_same;
+			}
+
+			if ( Mango::normalize($role->$role_key) === Mango::normalize($resource->$resource_key))
+			{
+				if ( ! $allow_same )
+				{
+					// fields are the same, not allowed
+					return FALSE;
+				}
+			}
+			else if ( $allow_same)
+			{
+				// fields are different, not allowed
 				return FALSE;
 			}
 		}
