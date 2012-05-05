@@ -49,9 +49,11 @@ class Model_Lock extends Mango {
 			$lock_key = $lock_key->_id;
 		}
 
-		$this->values( array(
+		$criteria = array(
 			'_id' => (string) $lock_key
-		))->load();
+		);
+
+		$this->values( $criteria)->load();
 
 		$now = time();
 
@@ -61,42 +63,33 @@ class Model_Lock extends Mango {
 			return FALSE;
 		}
 
+		// lock available - try to obtain
+		$criteria['user_id'] = $this->loaded()
+			? $this->user_id
+			: $user->_id;
+
 		$values = array(
 			'_id'     => (string) $lock_key,
 			'user_id' => $user->_id,
 			'ends'    => $now + $time
 		);
 
-		if ( ! $this->loaded())
-		{
-			// create
-			try
-			{
-				$this->values($values)->create();
+		$options = array(
+			'safe'   => TRUE,
+			'upsert' => TRUE
+		);
 
-				return $this->ends;
-			}
-			catch ( Mango_Exception $e)
-			{
-				// a lock for this object was just created, this one failed
-				return FALSE;
-			}
+		try
+		{
+			$this->db()->update($this->_collection, $criteria, $values, $options);
+
+			// lock obtained successfully
+			return $values['ends'];
 		}
-		else
+		catch ( MongoException $e)
 		{
-			// update criteria
-			$criteria = array(
-				'ends' => $this->ends
-			);
-
-			// update lock
-			$this->values($values)->update($criteria);
-
-			$err = $this->_db->last_error();
-
-			return (bool) $err['updatedExisting']
-				? $this->ends
-				: FALSE;
+			// lock was set by someone else
+			return FALSE;
 		}
 	}
 
