@@ -21,6 +21,11 @@ class Log_Mango extends Log_Writer {
 	 */
 	protected $_db;
 
+	/*
+	 * Log_File reference (only used when MongoDB fails)
+	 */
+	protected $_log;
+
 	/**
 	 * Creates a new mangoDB logger.
 	 *
@@ -31,7 +36,7 @@ class Log_Mango extends Log_Writer {
 	public function __construct($collection, $name = 'default')
 	{
 		$this->_collection = $collection;
-		$this->_name = $name;
+		$this->_name       = $name;
 	}
 
 	/**
@@ -44,10 +49,27 @@ class Log_Mango extends Log_Writer {
 	{
 		if ( $this->_db === NULL)
 		{
+			// MangoDB instance
 			$this->_db = MangoDB::instance($this->_name);
+
+			// connect
+			$this->_db->connect();
+
+			// check for connection
+			if ( ! $this->_db->connected())
+			{
+				// fallback to file logging
+				$this->_log = new Log_File(APPPATH.'logs');
+			}
 		}
 
-		$this->_db->batch_insert($this->_collection,$messages);
+		if ( $this->_db->connected())
+		{
+			$this->_db->batch_insert($this->_collection, $messages);
+		}
+		else
+		{
+			$this->_log->write($messages);
+		}
 	}
-
 } // End Log_Mango

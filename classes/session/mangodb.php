@@ -61,7 +61,16 @@ class Session_MangoDB extends Session
 				$session = Mango::factory('session', array(
 					'_id'   => $id[0],
 					'token' => $id[1]
-				))->load();
+				));
+
+				$db = $session->db();
+				$db->connect();
+
+				if ( $db->connected())
+				{
+					// only load session when a database connection could be established
+					$session->load();
+				}
 	
 				if ( $session->loaded() )
 				{
@@ -99,12 +108,20 @@ class Session_MangoDB extends Session
 			'token'       => new MongoId // regenerate against session fixation attacks
 		));
 
-		$this->_session->loaded()
-			? $this->_session->update()
-			: $this->_session->create();
+		$db = $this->db();
+		$db->connect();
 
-		// Update cookie
-		Cookie::set($this->_name, $this->_session->_id . '.' . $this->_session->token, $this->_lifetime);
+		// Only save session when a database collection was established
+		// this prevents MongoConnectionExceptions when the session is written
+		if ( $db->connected())
+		{
+			$this->_session->loaded()
+				? $this->_session->update()
+				: $this->_session->create();
+
+			// Update cookie
+			Cookie::set($this->_name, $this->_session->_id . '.' . $this->_session->token, $this->_lifetime);
+		}
 
 		return TRUE;
 	}
