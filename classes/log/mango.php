@@ -51,24 +51,20 @@ class Log_Mango extends Log_Writer {
 		{
 			// MangoDB instance
 			$this->_db = MangoDB::instance($this->_name);
-
-			// connect
-			$this->_db->connect();
-
-			// check for connection
-			if ( ! $this->_db->connected())
-			{
-				// fallback to file logging
-				$this->_log = new Log_File(APPPATH.'logs');
-			}
 		}
 
-		if ( $this->_db->connected())
+		if ( $this->_db->try_to_connect(FALSE))
 		{
 			$this->_db->batch_insert($this->_collection, $messages);
 		}
 		else
 		{
+			// fallback to file logging
+			if ( $this->_log === NULL)
+			{
+				$this->_log = new Log_File(APPPATH.'logs');
+			}
+
 			$this->_log->write($messages);
 		}
 	}
