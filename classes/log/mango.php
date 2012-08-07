@@ -53,11 +53,11 @@ class Log_Mango extends Log_Writer {
 			$this->_db = MangoDB::instance($this->_name);
 		}
 
-		if ( $this->_db->try_to_connect(FALSE))
+		try
 		{
 			$this->_db->batch_insert($this->_collection, $messages);
 		}
-		else
+		catch ( MongoException $e)
 		{
 			// fallback to file logging
 			if ( $this->_log === NULL)
