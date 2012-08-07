@@ -4,24 +4,29 @@
  */
 class Log_Mango extends Log_Writer {
 
-	/*
+	/**
 	 * Collection to write log data to
 	 * Make this is a capped collection for better performance
 	 * http://www.mongodb.org/display/DOCS/Capped+Collections
 	 */
 	protected $_collection;
 
-	/*
+	/**
 	 * Name of MangoDB configuration
 	 */
 	protected $_name;
 
-	/*
+	/**
 	 * MangoDB reference
 	 */
 	protected $_db;
 
-	/*
+	/**
+	 * MangoDB batch insert options
+	 */
+	protected $_options;
+
+	/**
 	 * Log_File reference (only used when MongoDB fails)
 	 */
 	protected $_log;
@@ -33,10 +38,11 @@ class Log_Mango extends Log_Writer {
 	 * @param   string  name of MangoDB configuration
 	 * @return  void
 	 */
-	public function __construct($collection, $name = 'default')
+	public function __construct($collection, $name = 'default', $options = array('safe' => TRUE))
 	{
 		$this->_collection = $collection;
 		$this->_name       = $name;
+		$this->_options    = $options;
 	}
 
 	/**
@@ -55,7 +61,7 @@ class Log_Mango extends Log_Writer {
 
 		try
 		{
-			$this->_db->batch_insert($this->_collection, $messages);
+			$this->_db->batch_insert($this->_collection, $messages, $this->_options);
 		}
 		catch ( MongoException $e)
 		{
