@@ -75,7 +75,7 @@ class Model_Lock extends Mango {
 		);
 
 		$options = array(
-			'safe'   => TRUE,
+			'w'   => 1,
 			'upsert' => TRUE
 		);
 
