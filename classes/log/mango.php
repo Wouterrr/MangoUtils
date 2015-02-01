@@ -38,7 +38,7 @@ class Log_Mango extends Log_Writer {
 	 * @param   string  name of MangoDB configuration
 	 * @return  void
 	 */
-	public function __construct($collection, $name = 'default', $options = array('safe' => TRUE))
+	public function __construct($collection, $name = 'default', $options = array())
 	{
 		$this->_collection = $collection;
 		$this->_name       = $name;
