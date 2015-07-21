@@ -59,6 +59,10 @@ class Log_Mango extends Log_Writer {
 			$this->_db = MangoDB::instance($this->_name);
 		}
 
+		foreach ( $messages as $message) {
+			unset($message['additional']);
+		}
+
 		try
 		{
 			$this->_db->batch_insert($this->_collection, $messages, $this->_options);
