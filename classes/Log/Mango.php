@@ -59,8 +59,9 @@ class Log_Mango extends Log_Writer {
 			$this->_db = MangoDB::instance($this->_name);
 		}
 
-		foreach ( $messages as $message) {
-			unset($message['additional']);
+		foreach ( $messages as &$message) {
+			$message['body'] = $this->format_message($message, 'body in file:line');
+			unset($message['additional'], $message['trace']);
 		}
 
 		try
