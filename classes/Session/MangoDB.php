@@ -45,44 +45,55 @@ class Session_MangoDB extends Session
 		}
 	}
 
-	/**
-	 * Read session data
-	 *
-	 * @param integer $id
-	 */
-	protected function _read($id = NULL)
-	{
-		if ( $id OR $id = Cookie::get($this->_name))
-		{
-			$id = explode('.', $id);
+    /**
+     * Read session data
+     *
+     * @param integer $id
+     */
+    protected function _read($id = NULL)
+    {
+        if ( $id OR $id = Cookie::get($this->_name))
+        {
+            $id = explode('.', $id);
 
-			if ( count($id) === 2)
-			{
-				$session = Mango::factory('session', array(
-					'_id'   => $id[0],
-					'token' => $id[1]
-				));
+            if ( count($id) === 2)
+            {
+                try {
+                    $session = Mango::factory('session', array(
+                        '_id'   => $id[0],
+                        'token' => $id[1]
+                    ));
 
-				$db = $session->db();
-				$db->connect();
+                    $session->load();
 
-				if ( $db->connected())
-				{
-					// only load session when a database connection could be established
-					$session->load();
-				}
-	
-				if ( $session->loaded() )
-				{
-					$this->_session = $session;
-	
-					return $session->contents;
-				}
-			}
-		}
+                    if ( $session->loaded() )
+                    {
+                        $this->_session = $session;
 
-		return NULL;
-	}
+                        return $this->_session->contents;
+                    }
+                } catch ( MongoException $e) {
+                    Kohana::$log->add(Log::ERROR, 'Unable to load session :id :token (:error)', array(
+                        ':id' => $id[0],
+                        ':token' => $id[1],
+                        ':error' => $e->getMessage(),
+                    ));
+                }
+            }
+        }
+
+        return NULL;
+    }
+
+    /**
+     * Restarts the current session.
+     *
+     * @return  boolean
+     */
+    protected function _restart()
+    {
+        // nothing here as the token is regenerated no matter what
+    }
 
   /**
    * Create new session
@@ -95,36 +106,38 @@ class Session_MangoDB extends Session
   /**
    * Write session data
    */
-  protected function _write()
-  {
-		if ( $this->_session === NULL)
-		{
-			$this->_session = Mango::factory('session');
-		}
+    /**
+     * Write session data
+     */
+    protected function _write()
+    {
+        if ( $this->_session === NULL)
+        {
+            $this->_session = Mango::factory('session');
+        }
 
-		$this->_session->values( array(
-			'last_active' => $this->_data['last_active'],
-			'contents'    => (string) $this,
-			'token'       => new MongoId // regenerate against session fixation attacks
-		));
+        $this->_session->values( array(
+            'last_active' => $this->_data['last_active'],
+            'contents'    => (string) $this,
+            'token'       => new MongoId // regenerate against session fixation attacks
+        ));
 
-		$db = $this->db();
-		$db->connect();
+        try {
+            $this->_session->loaded()
+                ? $this->_session->update()
+                : $this->_session->create();
 
-		// Only save session when a database collection was established
-		// this prevents MongoConnectionExceptions when the session is written
-		if ( $db->connected())
-		{
-			$this->_session->loaded()
-				? $this->_session->update()
-				: $this->_session->create();
+            // Update cookie
+            Cookie::set($this->_name, $this->_session->_id . '.' . $this->_session->token, $this->_lifetime);
+        } catch (MongoException $e) {
+            Kohana::$log->add(Log::ERROR, 'Unable to write session :token (:error)', array(
+                ':token' => $this->_session->token,
+                ':error' => $e->getMessage(),
+            ));
+        }
 
-			// Update cookie
-			Cookie::set($this->_name, $this->_session->_id . '.' . $this->_session->token, $this->_lifetime);
-		}
-
-		return TRUE;
-	}
+        return TRUE;
+    }
 
   /**
    * Delete session
